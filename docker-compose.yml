@@ -1,0 +1,24 @@
+version: "3.7"
+
+services:
+
+  ping:
+    image: tantaelorg/test:interview-latest
+    hostname: ping
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - INITIALIZER=1
+      - PYTHONUNBUFFERED=1
+  pong:
+    image: tantaelorg/test:interview-latest
+    hostname: pong
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - ping
+    environment:
+      - INITIALIZER=0
+      - PYTHONUNBUFFERED=1

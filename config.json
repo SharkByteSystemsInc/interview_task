@@ -1,0 +1,11 @@
+{
+  "ping": {
+    "PUB": {"HOST": "*","PORT" : "5555"},
+    "SUB": {"HOST": "pong","PORT" : "5556"}
+  },
+    "pong": {
+    "PUB": {"HOST": "*","PORT" : "5556"},
+    "SUB": {"HOST": "ping","PORT" : "5555"}
+  }
+
+}

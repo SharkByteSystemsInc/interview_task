@@ -1,46 +1,59 @@
+from os import getenv as env
+from socket import gethostname
+from time import sleep
+from typing import Optional
+
+from logger import logger
+
 import zmq
-import json, os
-import socket
-import time
-with open("config.json") as f:
-    config = json.load(f)
-def get_address(host, port):
-    addr = f"tcp://{host}:{port}"
-    print(addr)
-    return addr
 
-IS_FIRST = int(os.environ.get("INITIALIZER", "0"))
 
-MAX = int(os.environ.get("MAX_VALUE", "256"))
-HOSTNAME_PUB = config[socket.gethostname()]["PUB"]["HOST"]
-HOSTNAME_SUB = config[socket.gethostname()]["SUB"]["HOST"]
-
-PUB_PORT = config[socket.gethostname()]["PUB"]["PORT"]
-SUB_PORT = config[socket.gethostname()]["SUB"]["PORT"]
-
+IS_FIRST: bool = bool(int(env('INITIALIZER', 0)))
+MAX: int = int(env('MAX_VALUE', 10))
+HOST: str = gethostname()
+PUB_SERVER: str = env('PUB_SERVER', 'tcp://*:5555')
+SUB_CLIENT: Optional[str] = env('SUB_CLIENT')
 context = zmq.Context()
+
+logger.info(
+    f'Creating publisher server `{PUB_SERVER}` socket '
+    'type: ZMQ.PUB'
+)
 pub_socket = context.socket(zmq.PUB)
-print("Connecting publisher")
+pub_socket.bind(PUB_SERVER)
 
-pub_socket.bind(get_address(HOSTNAME_PUB, PUB_PORT))
-time.sleep(5)
-
+logger.info(
+    f'Connecting subscriber client `{HOST}` to {SUB_CLIENT} '
+    f'max: {MAX} socket type: ZMQ.SUB'
+)
 sub_socket = context.socket(zmq.SUB)
-sub_socket.setsockopt(zmq.SUBSCRIBE, b"")
-print("Connecting subscriber to publisher")
+sub_socket.setsockopt(zmq.SUBSCRIBE, b'')
+sub_socket.connect(SUB_CLIENT)
 
-sub_address = get_address(HOSTNAME_SUB, SUB_PORT)
-sub_socket.connect(sub_address)
+message: int = 0
 
-i = 0
+sleep(0.11)
 
+while message < MAX:
 
-while i < MAX:
-    print(f"Sending {i}")
-    pub_socket.send(bytes([i]))
+    if IS_FIRST:
+        pub_socket.send(message.to_bytes(2, 'big'))
+        logger.debug(f'Sent {message}')
+        IS_FIRST = False
+
     try:
-        print(sub_socket.recv(zmq.DONTWAIT))
-    except zmq.Again as a:
-        time.sleep(0.1)
+        resp = sub_socket.recv()
+        message = int.from_bytes(resp, 'big')
+        log_msg = f'Received: {message}'
+        message += 1
+
+        if message and message <= MAX:
+            pub_socket.send(message.to_bytes(2, 'big'))
+            log_msg += f' Sent {message}'
+
+    except zmq.Again:
         continue
-    i +=1
+    except Exception as e:
+        logger.error(e)
+
+    logger.debug(log_msg)
